@@ -1,0 +1,3 @@
+import {load} from '../_data';
+export const dynamic='force-dynamic';
+export default async function Sensors(){const data=await load('/api/v1/sensors/health');return <><h1>Sensores</h1><p className="page-lead">Indicadores de captura e ingestão. Sem heartbeat, não podemos afirmar que o sensor está online.</p><div className="two-columns">{(data?.items||[]).map((s,i)=><section className="panel" key={i}><h2>{s.sensor_id}</h2><p>Último evento: <strong>{s.last_event_at||'Não recebido'}</strong></p><p>Perda de pacotes: <strong>{s.packet_loss?.drop_percent == null?'Indisponível':`${s.packet_loss.drop_percent}%`}</strong></p></section>)}</div>{!data?.items?.length&&<div className="panel empty">Nenhuma telemetria de sensor disponível.</div>}</>}

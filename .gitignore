@@ -1,0 +1,41 @@
+# Local credentials and configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Private network data and logs
+logs/*
+!logs/.gitkeep
+captures/*
+!captures/.gitkeep
+*.pcap
+*.pcapng
+*.cap
+*.log
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Frontend output
+node_modules/
+.next/
+out/
+
+# OS files
+.DS_Store
+Thumbs.db

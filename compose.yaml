@@ -1,0 +1,107 @@
+name: edge-security
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: edge_security
+      POSTGRES_USER: edge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edge -d edge_security"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [internal]
+    restart: unless-stopped
+
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &db_env
+      DATABASE_URL: postgresql+psycopg://edge:${POSTGRES_PASSWORD}@postgres:5432/edge_security
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    restart: "no"
+
+  collector:
+    build: ./backend
+    command: ["python", "-m", "app.collector"]
+    environment:
+      <<: *db_env
+      SENSOR_ID: ${SENSOR_ID:-docker-lab-01}
+      EVE_PATH: /var/log/suricata/eve.json
+      POLL_INTERVAL: "1"
+    volumes:
+      - ./logs:/var/log/suricata:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [internal]
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *db_env
+      API_KEY: ${API_KEY:?set in .env}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set in .env}
+      PIHOLE_URL: http://pihole:80
+      PIHOLE_PASSWORD: ${PIHOLE_PASSWORD:?set in .env}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [internal]
+    restart: unless-stopped
+
+  dashboard:
+    build: ./frontend
+    environment:
+      API_KEY: ${API_KEY:?set in .env}
+      INTERNAL_API_URL: http://api:8000
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
+    networks: [internal]
+    restart: unless-stopped
+
+  pihole:
+    image: pihole/pihole:latest
+    environment:
+      TZ: America/Fortaleza
+      FTLCONF_webserver_api_password: ${PIHOLE_PASSWORD:?set in .env}
+      FTLCONF_dns_listeningMode: ALL
+      FTLCONF_dns_upstreams: '1.1.1.1;9.9.9.9'
+    ports:
+      - '127.0.0.1:5353:53/tcp'
+      - '127.0.0.1:5353:53/udp'
+    volumes:
+      - pihole_data:/etc/pihole
+    networks: [internal]
+    restart: unless-stopped
+
+  suricata:
+    image: jasonish/suricata:8.0
+    profiles: [pcap]
+    command: ["-r", "/captures/test.pcap", "-l", "/var/log/suricata"]
+    volumes:
+      - ./captures:/captures:ro
+      - ./logs:/var/log/suricata
+    networks: [internal]
+    restart: "no"
+
+networks:
+  internal:
+    driver: bridge
+volumes:
+  postgres_data:
+  pihole_data:

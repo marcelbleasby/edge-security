@@ -1,0 +1,7 @@
+import './globals.css';
+import Link from 'next/link';
+import LogoutButton from './logout-button';
+import {headers} from 'next/headers';
+export const metadata={title:'Edge Security | Administração',description:'Monitoramento e administração de segurança de rede'};
+const links=[['/','◈','Visão geral'],['/events','▤','Eventos'],['/alerts','◉','Alertas'],['/devices','▣','Dispositivos'],['/sensors','⌁','Sensores'],['/dns','◇','DNS e políticas'],['/history','↶','Histórico']];
+export default async function RootLayout({children}){const h=await headers();const login=h.get('x-edge-login')==='1';return <html lang="pt-BR"><body>{login?children:<div className="app-layout"><aside className="sidebar"><Link href="/" className="brand"><span className="brand-mark">✳</span><span className="brand-name">Edge Security</span></Link><div className="side-heading">Workspace</div><nav className="nav" aria-label="Navegação principal">{links.map(([href,icon,title])=><Link key={href} href={href} className="nav-link"><span className="nav-icon" aria-hidden="true">{icon}</span><span className="nav-label">{title}</span></Link>)}</nav><div className="sidebar-footer"><span className="status-dot"/>Painel administrativo<br/>Suricata + Pi-hole</div></aside><div className="content-shell"><header className="topbar"><span className="topbar-eyebrow">Segurança de rede / Console</span><LogoutButton/></header><div className="page-content">{children}</div></div></div>}</body></html>}

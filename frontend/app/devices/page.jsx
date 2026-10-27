@@ -1,0 +1,3 @@
+import {load} from '../_data';
+export const dynamic='force-dynamic';
+export default async function Devices(){const data=await load('/api/v1/devices?limit=100');return <><h1>Dispositivos observados</h1><p className="page-lead">Inventário derivado de IPs vistos pelo sensor. Um IP não identifica necessariamente um equipamento único.</p><section className="panel"><div className="table-scroll"><table><thead><tr><th>IP</th><th>Sensor</th><th>Última observação</th></tr></thead><tbody>{(data?.items||[]).map(x=><tr key={x.id}><td><code>{x.ip}</code></td><td>{x.sensor_id}</td><td>{x.last_seen_at||x.last_seen||'—'}</td></tr>)}</tbody></table></div>{!data?.items?.length&&<p className="empty">Nenhum dispositivo observado.</p>}</section></>}
