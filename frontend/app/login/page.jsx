@@ -1,6 +1,27 @@
 'use client';
 import {useState} from 'react';import {useRouter} from 'next/navigation';
 export default function Login(){const [username,setUsername]=useState('admin'),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');const router=useRouter();
- async function submit(e){e.preventDefault();setBusy(true);setError('');try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});if(!r.ok)throw Error('Usuário ou senha inválidos');router.replace('/');router.refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function submit(e){
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try{
+      const r=await fetch('/api/auth/login',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username,password})
+      });
+      if(!r.ok){
+        const data=await r.json().catch(()=>({}));
+        throw Error(data.error||'Usuário ou senha inválidos');
+      }
+      router.replace('/');
+      router.refresh();
+    }catch(e){
+      setError(e.message);
+    }finally{
+      setBusy(false);
+    }
+  }
  return <div className="login-wrap"><form className="login-card" onSubmit={submit}><div className="brand"><span className="brand-mark">✳</span>Edge Security</div><h1>Acesso administrativo</h1><p className="page-lead">Entre para administrar os sensores e as políticas de DNS.</p><label>Usuário<input autoComplete="username" required value={username} onChange={e=>setUsername(e.target.value)}/></label><label>Senha<input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<p role="alert" className="error-text">{error}</p>}<button disabled={busy} className="action-link">{busy?'Autenticando...':'Entrar'}</button></form></div>;
 }

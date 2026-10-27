@@ -21,6 +21,7 @@ services:
     command: ["alembic", "upgrade", "head"]
     environment: &db_env
       DATABASE_URL: postgresql+psycopg://edge:${POSTGRES_PASSWORD}@postgres:5432/edge_security
+      PYTHONPATH: /code
     depends_on:
       postgres:
         condition: service_healthy

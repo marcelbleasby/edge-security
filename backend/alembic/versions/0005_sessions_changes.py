@@ -1,12 +1,12 @@
 """Persist admin sessions and DNS change snapshots.
 
-Revision ID: 0005_sessions_changes
-Revises: 0004_policy_groups
+Revision ID: 0005
+Revises: 0004
 """
 from alembic import op
 import sqlalchemy as sa
-revision = '0005_sessions_changes'
-down_revision = '0004_policy_groups'
+revision = '0005'
+down_revision = '0004'
 branch_labels = None
 depends_on = None
 
