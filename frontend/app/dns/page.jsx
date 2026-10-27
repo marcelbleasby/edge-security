@@ -1,67 +1,75 @@
-import Link from 'next/link';
 import {createPolicy, deletePolicy, deployPolicy, rollbackDeployment, addGroup, addClient, assignClientGroups, setPolicyGroups, reconcileApply} from './actions';
+import {load} from '../_data';
+import {PageHeader,Panel,Note,Banner,Badge,EmptyState,Classification,fmtTime} from '../_ui/ui';
+import {SubmitButton} from '../_ui/client';
 export const dynamic = 'force-dynamic';
-const BASE = process.env.INTERNAL_API_URL || 'http://api:8000';
-async function get(path){try{const r=await fetch(BASE+path,{headers:{'X-API-Key':process.env.API_KEY||''},cache:'no-store'});return r.ok?await r.json():null;}catch{return null;}}
-const panel={border:'1px solid #334155',borderRadius:14,padding:20,background:'#162239'};
-const button={border:'1px solid #64748b',background:'#26364e',color:'white',padding:'8px 12px',borderRadius:8,cursor:'pointer'};
-const input={padding:'10px',borderRadius:8,background:'#0b1220',color:'white',border:'1px solid #64748b'};
 export default async function DNS(){
- const [policies,status,preview,overview,audit,groupPolicies,drift]=await Promise.all([get('/api/v1/policies/domains'),get('/api/v1/dns/status'),get('/api/v1/dns/preview'),get('/api/v1/dns/overview'),get('/api/v1/dns/audit'),get('/api/v1/dns/policy-groups'),get('/api/v1/dns/reconcile/preview')]);
+ const [policies,status,preview,overview,audit,groupPolicies,drift]=await Promise.all([load('/api/v1/policies/domains'),load('/api/v1/dns/status'),load('/api/v1/dns/preview'),load('/api/v1/dns/overview'),load('/api/v1/dns/audit'),load('/api/v1/dns/policy-groups'),load('/api/v1/dns/reconcile/preview')]);
  const eligible=new Set((preview?.items||[]).filter(x=>x.eligible).map(x=>x.id));
- return <main>
-  <Link href="/" style={{color:'#93c5fd'}}>← Monitoramento</Link>
-  <h1>Administração DNS</h1><p style={{color:'#94a3b8'}}>Gerenciamento próprio · Pi-hole v6 · publicação manual · inventário DNS · auditoria de alterações</p>
-  <section style={{...panel,marginBottom:18}}><h2>Estado do Pi-hole</h2><b style={{color:status?.available?'#4ade80':'#fbbf24'}}>{status?.available?'API conectada':'Indisponível'}</b><p style={{color:'#94a3b8'}}>O DNS não será alterado até que você publique uma regra explicitamente.</p></section>
-
-  <section style={{...panel,marginBottom:18}}><h2>Telemetria e reconciliação</h2>
-   {!overview?<p style={{color:'#fbbf24'}}>Não foi possível consultar o Pi-hole.</p>:<>
-   <div style={{display:'flex',gap:28,flexWrap:'wrap'}}><div>Grupos: <strong>{overview.groups?.length??0}</strong></div><div>Clientes: <strong>{overview.clients?.length??0}</strong></div><div>Regras gerenciadas: <strong>{overview.managed?.length??0}</strong></div><div style={{color:overview.managed_missing?'#fbbf24':'#4ade80'}}>Ausentes no Pi-hole: <strong>{overview.managed_missing}</strong></div></div>
-   <h3>Clientes DNS do Pi-hole</h3><div style={{maxHeight:160,overflow:'auto'}}>{(overview.clients||[]).map((c,i)=><div key={i} style={{borderBottom:'1px solid #334155',padding:7,fontSize:13}}>{String(c.client??c.ip??JSON.stringify(c))}</div>)}</div>
-   <h3>Grupos DNS</h3><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{(overview.groups||[]).map((g,i)=><span key={i} style={{background:'#26364e',padding:8,borderRadius:8}}>{String(g.name??JSON.stringify(g))}</span>)}</div>
-   <h3>Regras publicadas por este projeto</h3>{(overview.managed||[]).map(d=><div key={d.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,borderBottom:'1px solid #334155',padding:'9px 0'}}><div><strong>{d.domain}</strong><div style={{fontSize:12,color:d.present?'#4ade80':'#fbbf24'}}>{d.action} · {d.status} · {d.present?'presente':'ausente no Pi-hole'}</div></div>{d.status==='deployed'&&d.present&&<form action={rollbackDeployment}><input type="hidden" name="id" value={d.id}/><button style={button}>Reverter</button></form>}</div>)}
+ const groups=overview?.groups||[];
+ return <>
+  <PageHeader title="Administração DNS" lead="Gerenciamento próprio · publicação manual · inventário DNS · auditoria de alterações">
+   {status?.available?<Badge tone="success">Servidor DNS conectado</Badge>:<Badge tone="warning">Servidor DNS indisponível</Badge>}
+  </PageHeader>
+  <Banner tone="info"><p>O DNS não será alterado até que você publique uma regra explicitamente.</p></Banner>
+  <div className="stack">
+  <Panel title="Telemetria e reconciliação">
+   {!overview?<EmptyState title="Não foi possível consultar o servidor DNS">Verifique a conexão e as credenciais da API do servidor DNS.</EmptyState>:<>
+   <div className="kv"><div>Grupos<strong>{overview.groups?.length??0}</strong></div><div>Clientes<strong>{overview.clients?.length??0}</strong></div><div>Regras gerenciadas<strong>{overview.managed?.length??0}</strong></div><div>Ausentes no servidor<strong style={{color:overview.managed_missing?'var(--warning-fg)':'var(--accent-fg)'}}>{overview.managed_missing}</strong></div></div>
+   <div className="grid" style={{marginTop:'var(--space-xl)'}}>
+    <div><h3>Clientes DNS</h3>{!(overview.clients||[]).length?<EmptyState title="Nenhum cliente cadastrado"/>:<ul className="list scroll-box">{overview.clients.map((c,i)=><li key={i} className="list-row"><code>{String(c.client??c.ip??JSON.stringify(c))}</code></li>)}</ul>}</div>
+    <div><h3>Grupos DNS</h3>{!groups.length?<EmptyState title="Nenhum grupo"/>:<div className="chips">{groups.map((g,i)=><Badge key={i}>{String(g.name??JSON.stringify(g))}</Badge>)}</div>}</div>
+   </div>
+   <h3>Regras publicadas por este projeto</h3>
+   {!(overview.managed||[]).length?<EmptyState title="Nenhuma regra publicada"/>:<ul className="list">{overview.managed.map(d=><li key={d.id} className="list-row"><div className="list-main"><strong>{d.domain}</strong><div className="chips" style={{marginTop:4}}><Classification value={d.action}/><Badge>{d.status}</Badge>{d.present?<Badge tone="success">presente</Badge>:<Badge tone="warning">ausente no servidor</Badge>}</div></div>{d.status==='deployed'&&d.present&&<form action={rollbackDeployment}><input type="hidden" name="id" value={d.id}/><SubmitButton variant="danger" pendingLabel="Revertendo…" confirm={`Reverter a publicação de ${d.domain} no servidor DNS?`}>Reverter</SubmitButton></form>}</li>)}</ul>}
    </>}
-  </section>
-  <section style={{...panel,marginBottom:18}}><h2>Grupos e clientes DNS</h2>
-   <p style={{color:'#94a3b8'}}>As mudanças são aplicadas diretamente ao Pi-hole após confirmação. Identificação por IP ou CIDR; o IP precisa ser estável para associar uma política ao dispositivo certo.</p>
-   <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
-     <form action={addGroup} style={{display:'flex',gap:8,flexWrap:'wrap'}}><input name="name" required placeholder="Nome do grupo" style={input}/><button style={button}>Criar grupo</button></form>
-     <form action={addClient} style={{display:'flex',gap:8,flexWrap:'wrap'}}><input name="client" required placeholder="192.168.1.50" style={input}/><select name="group" style={input}>{(overview?.groups||[]).map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select><button style={button}>Cadastrar cliente</button></form>
+  </Panel>
+
+  <Panel title="Grupos e clientes DNS">
+   <p className="panel-meta">As mudanças são aplicadas diretamente ao servidor DNS após confirmação. Identificação por IP ou CIDR; o IP precisa ser estável para associar uma política ao dispositivo certo.</p>
+   <div className="grid" style={{marginTop:'var(--space-lg)',alignItems:'start'}}>
+     <form action={addGroup} className="form-row"><label className="field">Nome do grupo<input name="name" required maxLength={60} placeholder="ex.: iot" className="input"/></label><SubmitButton pendingLabel="Criando…">Criar grupo</SubmitButton></form>
+     <form action={addClient} className="form-row"><label className="field" style={{flex:'1 1 150px'}}>Cliente (IP ou CIDR)<input name="client" required placeholder="192.168.1.50" className="input mono"/></label><label className="field" style={{flex:'0 1 130px'}}>Grupo<select name="group" className="input">{groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label><SubmitButton pendingLabel="Cadastrando…">Cadastrar cliente</SubmitButton></form>
    </div>
    <h3>Associação de clientes</h3>
-   {(overview?.clients||[]).map((c,i)=><form action={assignClientGroups} key={i} style={{borderBottom:'1px solid #334155',padding:'12px 0'}}>
-     <input type="hidden" name="client" value={c.client}/><strong>{c.client}</strong>
-     <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'8px 0'}}>{(overview?.groups||[]).map(g=><label key={g.id} style={{fontSize:13}}><input type="checkbox" name="groups" value={g.id} defaultChecked={(c.groups||[]).includes(g.id)}/> {g.name}</label>)}</div>
-     <button style={button}>Salvar grupos</button>
-   </form>)}
-  </section>
-  <section style={{...panel,marginBottom:18}}><h2>Auditoria</h2>{!(audit?.items?.length)?<p>Sem alterações publicadas.</p>:(audit.items).map(x=><div key={x.id} style={{fontSize:13,padding:8,borderBottom:'1px solid #334155'}}><b>{x.event}</b> · {x.domain} · {String(x.created_at)}</div>)}</section>
-  <section style={{...panel,marginBottom:18}}><h2>Nova política</h2>
-   <form action={createPolicy} style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-    <input required name="domain" placeholder="exemplo.com" style={{...input,flex:2}}/>
-    <select name="action" style={input}><option value="watch">Monitorar</option><option value="allow">Permitir</option><option value="deny">Bloquear</option></select>
-    <button style={button}>Criar política</button>
+   {!(overview?.clients||[]).length?<EmptyState title="Nenhum cliente para associar"/>:<ul className="list">{overview.clients.map((c,i)=><li key={i} className="list-row"><form action={assignClientGroups} className="form-row" style={{width:'100%',justifyContent:'space-between',alignItems:'center'}}>
+     <input type="hidden" name="client" value={c.client}/><code>{c.client}</code>
+     <fieldset className="chips" style={{border:0,margin:0,padding:0,flex:1}}><legend className="sr-only">Grupos de {c.client}</legend>{groups.map(g=><label key={g.id} className="check"><input type="checkbox" name="groups" value={g.id} defaultChecked={(c.groups||[]).includes(g.id)}/>{g.name}</label>)}</fieldset>
+     <SubmitButton pendingLabel="Salvando…">Salvar grupos</SubmitButton>
+   </form></li>)}</ul>}
+  </Panel>
+
+  <Panel title="Nova política">
+   <form action={createPolicy} className="form-row">
+    <label className="field" style={{flex:'2 1 260px'}}>Domínio<input required name="domain" placeholder="exemplo.com" className="input mono"/></label>
+    <label className="field" style={{flex:'0 1 180px'}}>Ação<select name="action" className="input"><option value="watch">Monitorar</option><option value="allow">Permitir</option><option value="deny">Bloquear</option></select></label>
+    <SubmitButton variant="primary" pendingLabel="Criando…">Criar política</SubmitButton>
    </form>
-  </section>
-  <section style={{...panel,marginBottom:18}}><h2>Reconciliação de grupos</h2>
-    {(drift?.items||[]).map(d=><div key={d.deployment_id} style={{padding:7,borderBottom:'1px solid #334155'}}>{d.domain}: <b>{d.status}</b> · desejado: {(d.desired_groups||[]).join(', ')} · remoto: {(d.actual_groups||[]).join(', ')} {d.safe&&d.status==='groups_mismatch'&&<form action={reconcileApply} style={{display:'inline-flex',gap:8,marginLeft:12}}><input type='hidden' name='deployment_id' value={d.deployment_id}/><input type='hidden' name='fingerprint' value={d.expected_fingerprint}/><button style={button}>Confirmar reconciliação</button></form>}</div>)}
-    <p style={{fontSize:12,color:'#94a3b8'}}>A prévia é somente leitura; a aplicação ocorre apenas após confirmação e verificação de versão.</p>
-  </section>
-  <section style={panel}><h2>Políticas cadastradas</h2>
-   {!(policies?.items?.length) && <p>Nenhuma política cadastrada.</p>}
-   {(policies?.items||[]).map(p=><div key={p.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,borderBottom:'1px solid #334155',padding:'12px 0',flexWrap:'wrap'}}>
-    <div><strong>{p.domain}</strong><div style={{color:'#94a3b8',fontSize:13}}>{p.action} · {p.include_subdomains?'subdomínios incluídos':'somente domínio exato'} · {p.enabled?'habilitada':'desabilitada'}</div></div>
-    <form action={setPolicyGroups, reconcileApply} style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+   <Note>A política é apenas cadastrada; publique no servidor DNS para que tenha efeito.</Note>
+  </Panel>
+
+  <Panel title="Políticas cadastradas" meta={<span className="panel-meta">{policies?.items?.length||0} políticas</span>}>
+   {!(policies?.items?.length)?<EmptyState title="Nenhuma política cadastrada">Use o formulário acima para criar a primeira.</EmptyState>:<ul className="list">{policies.items.map(p=><li key={p.id} className="list-row" style={{flexWrap:'wrap',alignItems:'flex-start'}}>
+    <div className="list-main" style={{flex:'1 1 220px'}}><strong>{p.domain}</strong><div className="chips" style={{marginTop:4}}><Classification value={p.action}/><Badge>{p.include_subdomains?'subdomínios incluídos':'somente domínio exato'}</Badge>{p.enabled?<Badge tone="success">habilitada</Badge>:<Badge>desabilitada</Badge>}</div></div>
+    <form action={setPolicyGroups} className="form-row" style={{flex:'2 1 320px',alignItems:'center'}}>
       <input type="hidden" name="id" value={p.id}/>
-      {(overview?.groups||[]).map(g=><label key={g.id} style={{fontSize:12}}><input name="groups" type="checkbox" value={g.id} defaultChecked={(groupPolicies?.items||[]).find(x=>x.policy_id===p.id)?.groups?.includes(g.id)??(g.id===0)}/> {g.name}</label>)}
-      <button style={button}>Salvar escopo</button>
+      <fieldset className="chips" style={{border:0,margin:0,padding:0}}><legend className="sr-only">Grupos de {p.domain}</legend>{groups.map(g=><label key={g.id} className="check"><input name="groups" type="checkbox" value={g.id} defaultChecked={(groupPolicies?.items||[]).find(x=>x.policy_id===p.id)?.groups?.includes(g.id)??(g.id===0)}/>{g.name}</label>)}</fieldset>
+      <SubmitButton pendingLabel="Salvando…">Salvar escopo</SubmitButton>
     </form>
-    <div style={{display:'flex',gap:8}}>
-     {eligible.has(p.id)&&<form action={deployPolicy}><input type="hidden" name="id" value={p.id}/><button style={button}>Publicar no Pi-hole</button></form>}
-     <form action={deletePolicy}><input type="hidden" name="id" value={p.id}/><button style={button}>Excluir do cadastro</button></form>
+    <div className="list-actions">
+     {eligible.has(p.id)&&<form action={deployPolicy}><input type="hidden" name="id" value={p.id}/><SubmitButton variant="primary" pendingLabel="Publicando…" confirm={`Publicar a política de ${p.domain} no servidor DNS? O DNS da rede será alterado.`}>Publicar no DNS</SubmitButton></form>}
+     <form action={deletePolicy}><input type="hidden" name="id" value={p.id}/><SubmitButton variant="danger" pendingLabel="Excluindo…" confirm={`Excluir ${p.domain} do cadastro? Regras já publicadas no servidor DNS não são removidas.`}>Excluir do cadastro</SubmitButton></form>
     </div>
-   </div>)}
-   <p style={{fontSize:12,color:'#94a3b8'}}>Excluir do cadastro não remove regras já publicadas no Pi-hole. Nesta versão, revise entradas aplicadas diretamente no Pi-hole antes de removê-las.</p>
-  </section>
- </main>;
+   </li>)}</ul>}
+   <Note>Excluir do cadastro não remove regras já publicadas no servidor DNS. Nesta versão, revise entradas aplicadas diretamente no servidor DNS antes de removê-las.</Note>
+  </Panel>
+
+  <Panel title="Reconciliação de grupos">
+    {!(drift?.items||[]).length?<EmptyState title="Nenhuma divergência para reconciliar"/>:<ul className="list">{drift.items.map(d=><li key={d.deployment_id} className="list-row" style={{flexWrap:'wrap'}}><div className="list-main"><strong>{d.domain}</strong> <Badge tone={d.status==='groups_mismatch'?'warning':'neutral'}>{d.status}</Badge><span className="cell-sub">desejado: {(d.desired_groups||[]).join(', ')||'—'} · remoto: {(d.actual_groups||[]).join(', ')||'—'}</span></div>{d.safe&&d.status==='groups_mismatch'&&<form action={reconcileApply}><input type='hidden' name='deployment_id' value={d.deployment_id}/><input type='hidden' name='fingerprint' value={d.expected_fingerprint}/><SubmitButton variant="primary" pendingLabel="Aplicando…" confirm={`Aplicar os grupos desejados de ${d.domain} no servidor DNS?`}>Confirmar reconciliação</SubmitButton></form>}</li>)}</ul>}
+    <Note>A prévia é somente leitura; a aplicação ocorre apenas após confirmação e verificação de versão.</Note>
+  </Panel>
+
+  <Panel title="Auditoria">{!(audit?.items?.length)?<EmptyState title="Sem alterações publicadas"/>:<ul className="list scroll-box">{audit.items.map(x=><li key={x.id} className="list-row"><div className="list-main"><strong>{x.event}</strong> · {x.domain}</div><span className="mono cell-sub">{fmtTime(x.created_at)}</span></li>)}</ul>}</Panel>
+  </div>
+ </>;
 }

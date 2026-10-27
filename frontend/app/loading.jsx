@@ -1,0 +1,1 @@
+export default function Loading(){return <div aria-busy="true" aria-label="Carregando"><div className="skeleton" style={{height:32,width:260,marginBottom:24}}/><div className="stats-grid">{[0,1,2,3].map(i=><div key={i} className="skeleton" style={{height:96}}/>)}</div><div className="skeleton" style={{height:320}}/></div>;}
