@@ -1,0 +1,68 @@
+# Laboratório de rede local para simular o sensor de monitoramento.
+# Uso: docker compose -f compose.yaml -f compose.lab.yaml --profile lab up -d
+# Guia: docs/lab-rede-teste.md
+services:
+  pihole:
+    networks:
+      lab:
+        ipv4_address: 172.30.0.53
+
+  lab-web:
+    image: nginx:1.27-alpine
+    profiles: [lab]
+    networks:
+      lab:
+        ipv4_address: 172.30.0.80
+    restart: unless-stopped
+
+  lab-client-1:
+    image: alpine:3.20
+    profiles: [lab]
+    command: ["sh", "/lab/traffic.sh"]
+    environment:
+      INTERVAL: "20"
+    volumes:
+      - ./lab/traffic.sh:/lab/traffic.sh:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.0.11
+    depends_on: [lab-web, pihole]
+    restart: unless-stopped
+
+  lab-client-2:
+    image: alpine:3.20
+    profiles: [lab]
+    command: ["sh", "/lab/traffic.sh"]
+    environment:
+      INTERVAL: "45"
+      SCAN: "1"
+    volumes:
+      - ./lab/traffic.sh:/lab/traffic.sh:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.0.12
+    depends_on: [lab-web, pihole]
+    restart: unless-stopped
+
+  # Sensor ao vivo: escuta a bridge da rede lab como se fosse uma porta SPAN.
+  suricata-live:
+    image: jasonish/suricata:8.0
+    profiles: [lab]
+    network_mode: host
+    cap_add: [NET_ADMIN, NET_RAW, SYS_NICE]
+    command: ["--af-packet=br-edgelab", "-k", "none", "-S", "/opt/edge-lab/lab.rules", "-l", "/var/log/suricata"]
+    volumes:
+      - ./lab/rules/lab.rules:/opt/edge-lab/lab.rules:ro
+      - ./logs:/var/log/suricata
+    depends_on: [lab-web]
+    restart: unless-stopped
+
+networks:
+  lab:
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: br-edgelab
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

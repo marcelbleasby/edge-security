@@ -94,7 +94,9 @@ docker compose --profile pcap run --rm suricata
 docker compose logs --tail=100 collector
 ```
 
-Os arquivos EVE do Suricata ficam em `logs/`. O gerador `scripts/seed_eve.py` produz **dados fictícios** e não representa detecções reais na rede.
+Os arquivos EVE do Suricata ficam em `logs/`.
+
+Para simular o sensor com captura ao vivo numa rede de laboratório isolada (clientes, Pi-hole e alertas determinísticos), veja [docs/lab-rede-teste.md](docs/lab-rede-teste.md). O gerador `scripts/seed_eve.py` produz **dados fictícios** e não representa detecções reais na rede.
 
 ## Políticas DNS e rollback
 
